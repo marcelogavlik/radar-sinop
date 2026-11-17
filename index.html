@@ -68,6 +68,8 @@ details>.dentro{padding:0 14px 12px}
 .card{border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:8px}
 .card h3{margin:0;font-size:18px}
 .card .pt{font-size:13px;color:var(--mut)}
+.card .mail{font-size:13.5px;overflow-wrap:anywhere;text-decoration:none}
+.card .mail:hover{text-decoration:underline}
 .av{width:42px;height:42px;border-radius:50%;background:var(--ac2);color:var(--ac);display:grid;place-items:center;font-weight:700;flex:none}
 .cab{display:flex;gap:12px;align-items:center}
 .kv{display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-size:14px}
@@ -486,6 +488,7 @@ function cards(){
       '<span>Propostas de lei</span><span>'+(c.lei||0)+'</span>'+
       '<span>Perguntas e cobranças</span><span>'+(c.cobranca||0)+'</span>'+
       '<span>Homenagens</span><span>'+(c.homenagem||0)+'</span></div>'+
+      (v.email&&v.status==='exercicio'?'<a class="mail" href="mailto:'+esc(v.email)+'">✉ '+esc(v.email)+'</a>':'')+
       '<button data-v="'+esc(v.slug)+'">Ver tudo</button></div>';
   }).join('')||'<div class="vazio">Nenhum vereador com esse filtro.</div>';
 }
@@ -498,7 +501,8 @@ function abrir(slug){
   var meus=D.docs.filter(function(d){return d.a.indexOf(slug)>=0;});
   var pr=v.pres, h='<button class="fechar" onclick="document.getElementById(\'dlg\').close()">Fechar</button>'+
     '<h2 style="margin-top:0">'+esc(v.nome)+'</h2><p class="sub">'+esc(v.partido||'')+(v.cargo?' · '+esc(v.cargo):'')+(v.obs?' · '+esc(v.obs):'')+
-    ' · <a href="'+esc(v.url)+'" target="_blank" rel="noopener">ficha oficial na Câmara</a></p>';
+    ' · <a href="'+esc(v.url)+'" target="_blank" rel="noopener">ficha oficial na Câmara</a>'+
+    (v.email&&v.status==='exercicio'?' · e-mail (o publicado na ficha oficial): <a href="mailto:'+esc(v.email)+'">'+esc(v.email)+'</a>':'')+'</p>';
   h+='<h3>Presença</h3>';
   if(pr){
     h+='<p>Presente em <b>'+pr.presente+'</b> de <b>'+pr.sessoes+'</b> sessões ordinárias e extraordinárias em que o nome dele aparece na chamada.</p>';
