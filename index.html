@@ -87,6 +87,10 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:24px 0 50px;colo
 .abas button{font:inherit;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:99px;padding:8px 14px;cursor:pointer}
 .abas button.on{background:var(--ac);border-color:var(--ac);color:#fff;font-weight:600}
 .pct{display:inline-block;min-width:52px;font-weight:700}
+.tabctl{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.tabctl select{width:auto;padding:7px 10px;font-size:14px}
+th .seta{color:var(--ac);font-size:11px}
+th[data-ord]{color:var(--ac)}
 .mini{height:8px;border-radius:99px;background:var(--soft);overflow:hidden;min-width:70px}
 .mini i{display:block;height:100%;background:var(--ac)}
 h4{margin:22px 0 4px;font-size:16px}
@@ -292,6 +296,43 @@ function paginar(el, itens, render, passo){
   el.appendChild(b); b.onclick=mais; mais();
 }
 
+// ---------- tabelas: ordenar tocando no titulo da coluna + filtro por partido
+function valorCel(td){
+  var t=td.innerText.trim(), m=t.match(/-?\d[\d.]*(,\d+)?/);
+  if(td.cellIndex===0||!m) return t==='—'||t===''?null:norm(t);
+  return parseFloat(m[0].replace(/\./g,'').replace(',','.'));
+}
+function enfeitar(box){
+  box.querySelectorAll('table').forEach(function(tb){
+    if(!tb.querySelector('tr[data-p]')) return;
+    var cab=tb.rows[0], corpo=cab.parentNode;
+    Array.prototype.forEach.call(cab.cells,function(th,i){
+      if(!th.textContent.trim()) return;
+      th.style.cursor='pointer'; th.title='Toque para ordenar'; th.insertAdjacentHTML('beforeend',' <span class="seta">↕</span>');
+      th.addEventListener('click',function(){
+        var desc = th.dataset.ord!=='desc' && i>0 || th.dataset.ord==='asc';
+        Array.prototype.forEach.call(cab.cells,function(o){ delete o.dataset.ord; var s=o.querySelector('.seta'); if(s) s.textContent='↕'; });
+        th.dataset.ord=desc?'desc':'asc'; th.querySelector('.seta').textContent=desc?'↓':'↑';
+        var linhas=Array.prototype.slice.call(tb.rows,1);
+        linhas.sort(function(a,b){
+          var x=valorCel(a.cells[i]), y=valorCel(b.cells[i]);
+          if(x===null) return 1; if(y===null) return -1;
+          var r = typeof x==='number'&&typeof y==='number' ? x-y : String(x).localeCompare(String(y),'pt');
+          return desc?-r:r;
+        });
+        linhas.forEach(function(r){ corpo.appendChild(r); });
+      });
+    });
+    var ps={}; tb.querySelectorAll('tr[data-p]').forEach(function(r){ if(r.dataset.p) ps[r.dataset.p]=1; });
+    var sel=document.createElement('select'); sel.className='filtroP';
+    sel.innerHTML='<option value="">Todos os partidos</option>'+Object.keys(ps).sort().map(function(p){return '<option>'+esc(p)+'</option>';}).join('');
+    sel.addEventListener('change',function(){ tb.querySelectorAll('tr[data-p]').forEach(function(r){ r.hidden = !!sel.value && r.dataset.p!==sel.value; }); });
+    var dica=document.createElement('div'); dica.className='tabctl';
+    dica.appendChild(sel); dica.insertAdjacentHTML('beforeend','<span class="nota" style="margin:0">Toque no título de uma coluna para ordenar.</span>');
+    var alvo=tb.closest('.tw')||tb; alvo.parentNode.insertBefore(dica,alvo);
+  });
+}
+
 // ---------- topo
 var emEx = D.vereadores.filter(function(v){return v.status==='exercicio';});
 $('atualizado').textContent = 'Dados coletados em '+(D.coletado_em?dt(D.coletado_em.slice(0,10))+' às '+D.coletado_em.slice(11):'—');
@@ -363,9 +404,9 @@ $('grupoVer').innerHTML = D.vereadores.filter(function(v){return total(v)>0;}).s
   var vs=D.vereadores.filter(function(v){return v.emendas&&v.emendas.n;}).sort(function(a,b){return b.emendas.total-a.emendas.total;});
   h+='<h4>Por vereador</h4><div class="tw"><table><tr><th>Vereador</th><th>Total indicado</th><th>Emendas</th><th>Área que mais recebeu</th></tr>'+vs.map(function(v){
     var c=v.emendas.cat, kk=Object.keys(c).sort(function(a,b){return c[b]-c[a];}), top=kk.filter(function(k){return k.indexOf('não informada')<0;})[0]||kk[0];
-    return '<tr><td><button class="link" data-v="'+esc(v.slug)+'" style="text-align:left">'+esc(nomeDe(v.slug))+'</button></td><td><b>'+brl(v.emendas.total)+'</b></td><td>'+v.emendas.n+'</td><td>'+esc(top)+' ('+brl(c[top])+')</td></tr>'; }).join('')+'</table></div>';
+    return '<tr data-p="'+esc(v.partido||'')+'"><td><button class="link" data-v="'+esc(v.slug)+'" style="text-align:left">'+esc(nomeDe(v.slug))+'</button></td><td><b>'+brl(v.emendas.total)+'</b></td><td>'+v.emendas.n+'</td><td>'+esc(top)+' ('+brl(c[top])+')</td></tr>'; }).join('')+'</table></div>';
   h+='<h4>Consultar emenda por emenda</h4><div class="row"><input type="search" id="qe" placeholder="Ex.: APAE, saúde, CONSEG, escola…"><select id="fe"><option value="">Todas as áreas</option>'+ks.map(function(k){return '<option>'+esc(k)+'</option>';}).join('')+'</select></div><div id="emLista"></div>';
-  el.innerHTML=h;
+  el.innerHTML=h; enfeitar(el);
   var linhas=[]; com.forEach(function(d){ d.em.forEach(function(e){ linhas.push({d:d,e:e,_n:norm((e.ds||d.e)+' '+e.c+' '+autores(d))}); }); });
   linhas.sort(function(a,b){return b.e.v-a.e.v;});
   function lista(){ var q=norm($('qe').value.trim()).split(/\s+/).filter(Boolean), f=$('fe').value;
@@ -394,7 +435,7 @@ function itemDiaria(i){ return '<li><div class="meta">'+esc(i.d)+' a '+esc(i.r)+
     '<div class="num"><b>'+brl(totDi)+'</b><small>em diárias de vereadores desde 2025</small></div></div>';
   h+='<h4>Vereador por vereador</h4><p class="nota">Diárias e verba somam tudo o que foi pago desde janeiro de 2025. Toque no nome para ver cada viagem.</p><div class="tw"><table><tr><th>Vereador</th><th>Salário mensal</th><th>Verba indenizatória recebida</th><th>Diárias</th><th>Viagens</th></tr>'+
     vs.slice().sort(function(a,b){return b.gastos.diarias_total-a.gastos.diarias_total;}).map(function(v){ var g=v.gastos;
-      return '<tr><td><button class="link" data-v="'+esc(v.slug)+'" style="text-align:left">'+esc(nomeDe(v.slug))+'</button></td><td>'+(g.subsidio?brl2(g.subsidio):'—')+'</td><td>'+(g.verba?brl2(g.verba)+' <span style="color:var(--mut)">('+g.verba_meses+' meses)</span>':'—')+'</td><td><b>'+brl2(g.diarias_total)+'</b></td><td>'+g.diarias.length+'</td></tr>'; }).join('')+'</table></div>';
+      return '<tr data-p="'+esc(v.partido||'')+'"><td><button class="link" data-v="'+esc(v.slug)+'" style="text-align:left">'+esc(nomeDe(v.slug))+'</button></td><td>'+(g.subsidio?brl2(g.subsidio):'—')+'</td><td>'+(g.verba?brl2(g.verba)+' <span style="color:var(--mut)">('+g.verba_meses+' meses)</span>':'—')+'</td><td><b>'+brl2(g.diarias_total)+'</b></td><td>'+g.diarias.length+'</td></tr>'; }).join('')+'</table></div>';
   var rp=G.verba_repetidas||{};
   Object.keys(rp).forEach(function(n){ h+='<div class="aviso">Atenção: nos documentos oficiais da verba indenizatória, o nome “'+esc(n)+'” aparece duas vezes no mesmo mês em '+rp[n]+' meses. O site contou só uma vez para ele. A linha repetida não foi atribuída a ninguém, e há vereador do período que não aparece nesses documentos. Parece erro de digitação da Câmara.</div>'; });
   h+='<h4>Assessores de gabinete</h4><p>O Portal da Transparência lista <b>'+nAss+'</b> servidores comissionados lotados em “Gabinete de Vereador”, para '+nVer+' vereadores. Dá, em média, <b>'+(nAss/nVer).toLocaleString('pt-BR',{maximumFractionDigits:1})+'</b> assessores e <b>'+brl(custoAss/nVer)+'</b> por mês em salário-base para cada gabinete.</p>'+
@@ -403,7 +444,7 @@ function itemDiaria(i){ return '<li><div class="meta">'+esc(i.d)+' a '+esc(i.r)+
   h+='<details id="detOut"><summary><span>Diárias de assessores e servidores</span><span class="cnt">'+brl(totOut)+'</span></summary><div class="dentro"><p class="nota">Servidores que não são vereadores e receberam diária desde 2025. Assessores de gabinete costumam viajar acompanhando um vereador, mas o portal não liga um ao outro.</p><div class="tw"><table><tr><th>Nome</th><th>Cargo</th><th>Ano</th><th>Diárias</th><th>Total</th></tr>'+
     G.outros_diarias.map(function(o){return '<tr><td><a href="'+esc(o.u)+'" target="_blank" rel="noopener">'+esc(o.nome)+'</a></td><td>'+esc(o.cargo)+'</td><td>'+o.ano+'</td><td>'+o.n+'</td><td>'+brl2(o.total)+'</td></tr>';}).join('')+'</table></div></div></details>';
   h+='<p class="nota">Fontes: <a href="'+esc(G.fonte_diarias)+'" target="_blank" rel="noopener">Diárias</a>, <a href="'+esc(G.fonte_verba)+'" target="_blank" rel="noopener">Verbas indenizatórias</a> e <a href="'+esc(q.fonte)+'" target="_blank" rel="noopener">Quadro de Servidores</a> do Portal da Transparência da Câmara. Salário é o valor bruto do quadro, sem encargos, 13º ou férias.</p>';
-  el.innerHTML=h;
+  el.innerHTML=h; enfeitar(el);
 })();
 
 // ---------- faltas e nao votou
@@ -416,10 +457,10 @@ function itemDiaria(i){ return '<li><div class="meta">'+esc(i.d)+' a '+esc(i.r)+
     return {v:v, ses:v.pres.sessoes, aus:f.length-just, just:just, nv:nv, ab:ab, tv:tv};
   }).sort(function(a,b){ return (b.aus+b.just)-(a.aus+a.just) || b.nv-a.nv; });
   var h='<div class="tw"><table><tr><th>Vereador</th><th>Sessões na chamada</th><th>Faltas sem justificativa</th><th>Faltas justificadas</th>'+(temVoto?'<th>Votações</th><th>Não votou</th><th>Abstenções</th>':'')+'</tr>'+
-    l.map(function(x){ return '<tr><td><button class="link" data-v="'+esc(x.v.slug)+'" style="text-align:left">'+esc(nomeDe(x.v.slug))+'</button>'+(x.v.status!=='exercicio'?' <span style="color:var(--mut)">('+(x.v.status==='licenciado'?'licenciado':'atuou na legislatura')+')</span>':'')+'</td><td>'+x.ses+'</td><td'+(x.aus?' style="font-weight:700"':'')+'>'+x.aus+'</td><td>'+x.just+'</td>'+
+    l.map(function(x){ return '<tr data-p="'+esc(x.v.partido||'')+'"><td><button class="link" data-v="'+esc(x.v.slug)+'" style="text-align:left">'+esc(nomeDe(x.v.slug))+'</button>'+(x.v.status!=='exercicio'?' <span style="color:var(--mut)">('+(x.v.status==='licenciado'?'licenciado':'atuou na legislatura')+')</span>':'')+'</td><td>'+x.ses+'</td><td'+(x.aus?' style="font-weight:700"':'')+'>'+x.aus+'</td><td>'+x.just+'</td>'+
       (temVoto?'<td>'+x.tv+'</td><td>'+x.nv+(x.tv?' <span style="color:var(--mut)">('+Math.round(100*x.nv/x.tv)+'%)</span>':'')+'</td><td>'+x.ab+'</td>':'')+'</tr>'; }).join('')+'</table></div>';
   h+='<p class="nota">Falta é o que o sistema da Câmara registra na chamada como “Ausente” ou “Ausência justificada”. “Não votou” junta os registros “Não votou” e “Não vota” e também quem estava ausente na hora da votação. Quem preside a sessão em regra não vota, só desempata: por isso quem foi presidente no período aparece com número alto, e isso não é omissão.'+(temVoto?'':'Os votos nominais ainda estão em coleta.')+'</p>';
-  el.innerHTML=h;
+  el.innerHTML=h; enfeitar(el);
 })();
 
 // ---------- cards
