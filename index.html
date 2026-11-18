@@ -104,6 +104,34 @@ h4{margin:22px 0 4px;font-size:16px}
 .corr .row{margin:0}
 .corr button{align-self:flex-start;font:inherit;font-weight:600;border:0;background:var(--ac);color:#fff;border-radius:10px;padding:11px 18px;cursor:pointer}
 .corr button:disabled{opacity:.6;cursor:default}
+/* contador de salarios */
+.contador{background:var(--ink);color:#fff;border-radius:16px;padding:18px 20px;margin:20px 0 4px}
+.contador small{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;opacity:.75}
+.contador b{display:block;font-size:clamp(28px,7vw,44px);letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin:2px 0}
+.contador span{font-size:13px;opacity:.8}
+/* presenca e votos no cracha */
+.pres{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;background:var(--soft);border-radius:12px;padding:10px 12px}
+.pres b{font-size:28px;letter-spacing:-.02em;line-height:1}
+.pres span{font-size:13px;color:var(--mut)}
+.pres.baixa b{color:var(--bad)}
+.urna{font-size:13.5px;color:var(--mut)}
+.urna b{color:var(--ink)}
+/* comece por aqui */
+.bairros{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 4px}
+.bairros button{font:inherit;font-size:14px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:99px;padding:6px 12px;cursor:pointer}
+.bairros button:hover,.bairros button.on{border-color:var(--ac);color:var(--ac)}
+.resumos{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin:16px 0}
+.resumo{background:var(--soft);border-radius:12px;padding:12px 14px;font-size:14px}
+.resumo h5{margin:0 0 6px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+.resumo div{display:flex;justify-content:space-between;gap:8px;padding:2px 0}
+.resumo div b{color:var(--ac)}
+/* pedidos que voltam */
+.rep-sum{display:flex;flex-direction:column;gap:2px}
+.rep-sum small{font-weight:400;color:var(--mut);font-size:13px}
+.cobrar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.cobrar a,.cobrar button{font:inherit;font-size:14px;font-weight:600;border-radius:10px;padding:8px 14px;cursor:pointer;text-decoration:none;border:1px solid var(--ac)}
+.cobrar a{background:var(--ac);color:#fff}
+.cobrar button{background:#fff;color:var(--ac)}
 @media (max-width:560px){ .linha{grid-template-columns:104px 1fr 36px} nav{display:none} }
 </style>
 </head>
@@ -132,13 +160,15 @@ h4{margin:22px 0 4px;font-size:16px}
     <h1>O que cada vereador de Sinop fez desde que tomou posse</h1>
     <p>Presença nas sessões, propostas, homenagens, pedidos para os bairros e votos. Tudo tirado do sistema da própria Câmara Municipal, com link para conferir.</p>
     <p>Site independente, feito por morador. Sem ligação com a Câmara, a Prefeitura ou partido. Não dá nota nem opinião: só mostra o dado.</p>
+    <div class="contador" id="contador" hidden></div>
     <div class="nums" id="nums"></div>
   </div>
 
   <section id="busca">
     <h2>O que pediram para o seu bairro?</h2>
-    <p class="sub">Digite o nome do bairro ou da rua e veja todos os pedidos de melhoria feitos para lá, e por quem.</p>
+    <p class="sub">Digite o nome do bairro ou da rua, ou toque em um dos bairros mais citados. Sem nada digitado, você vê a cidade inteira.</p>
     <input type="search" id="q" placeholder="Ex.: Jardim Botânico, Avenida das Embaúbas, Camping Club…" autocomplete="off">
+    <div class="bairros" id="bairrosTop"></div>
     <div id="buscaRes"></div>
   </section>
 
@@ -369,13 +399,57 @@ $('nums').innerHTML = [
 ].map(function(x){return '<div class="num"><b>'+x[0].toLocaleString('pt-BR')+'</b><small>'+x[1]+'</small></div>';}).join('');
 $('tituloVer').textContent = 'Os '+emEx.length+' vereadores';
 
+// ---------- contador: salarios pagos desde a posse (estimativa a partir do quadro oficial)
+(function(){
+  var G=D.gastos; if(!G||!G.quadro||!G.quadro.eletivos) return;
+  var el=G.quadro.eletivos, mes=el.reduce(function(s,x){return s+x.qtd*x.salario;},0), nV=el.reduce(function(s,x){return s+x.qtd;},0);
+  if(!mes) return;
+  var posse=new Date('2025-01-01T00:00:00-03:00').getTime(), MES=30.436875*864e5;
+  var c=$('contador'); c.hidden=false;
+  var ver=el.filter(function(x){return /vereador/i.test(x.cargo);})[0]||el[0];
+  c.innerHTML='<small>Salário pago aos '+nV+' vereadores desde a posse</small><b id="cntV">—</b>'+
+    '<span>e subindo agora · estimativa: '+nV+' salários por mês ('+brl(ver.salario)+' cada'+(el.length>1?'; o do presidente é '+brl(Math.max.apply(null,el.map(function(x){return x.salario;}))):'')+
+    ') desde 1º de janeiro de 2025, valor bruto, sem 13º, férias e encargos. <a href="#gastos" style="color:#fff">Ver gastos</a></span>';
+  var b=$('cntV');
+  function tic(){ b.textContent=((Date.now()-posse)/MES*mes).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
+  tic(); setInterval(tic,1000);
+})();
+
 // ---------- busca por bairro
 var pedidos = D.docs.filter(function(d){return d.g==='pedido';});
 pedidos.forEach(function(d){ d._n = norm(d.e); });
 var tq;
+// "comece por aqui": bairros, temas e autores mais frequentes, calculados dos proprios pedidos
+var VIAS=/^(rua|avenida|av\.|travessa|estrada|rodovia)\b/i;
+var bCont={}, bNome={}, tCont={}, aCont={};
+pedidos.forEach(function(d){
+  var vistos={};
+  (d.lo||[]).forEach(function(l){ if(VIAS.test(l)) return; var nm=l.replace(/^Bairro\s+/i,''), k=norm(nm); if(nm.length<4||vistos[k]) return; vistos[k]=1; bCont[k]=(bCont[k]||0)+1; bNome[k]=bNome[k]||nm; });
+  (d.tm||[]).forEach(function(t){ tCont[t]=(tCont[t]||0)+1; });
+});
+D.docs.forEach(function(d){ (d.a||[]).forEach(function(a){ if(V[a]) aCont[a]=(aCont[a]||0)+1; }); });
+function topo(o,n){ return Object.keys(o).sort(function(a,b){return o[b]-o[a];}).slice(0,n); }
+// recontagem igual a da busca (o nome aparece em qualquer parte do texto), para o numero bater com o resultado
+topo(bCont,30).forEach(function(k){ bCont[k]=pedidos.filter(function(d){return d._n.indexOf(k)>=0;}).length; });
+var bTop=topo(bCont,10);
+$('bairrosTop').innerHTML=bTop.map(function(k){return '<button data-b="'+esc(bNome[k])+'">'+esc(bNome[k])+'</button>';}).join('');
+$('bairrosTop').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return; var q=$('q');
+  q.value = q.value===b.dataset.b ? '' : b.dataset.b; buscar(); });
+function marcarBairro(){ var v=$('q').value; Array.prototype.forEach.call($('bairrosTop').children,function(b){ b.classList.toggle('on', b.dataset.b===v); }); }
+function cidadeInteira(){
+  function caixa(tit, ks, nome, val){ return '<div class="resumo"><h5>'+tit+'</h5>'+ks.map(function(k){return '<div><span>'+nome(k)+'</span><b>'+val(k).toLocaleString('pt-BR')+'</b></div>';}).join('')+'</div>'; }
+  return '<p style="margin:14px 0 0"><b>'+D.docs.length.toLocaleString('pt-BR')+'</b> propostas dos vereadores para a cidade inteira desde janeiro de 2025, sendo <b>'+pedidos.length.toLocaleString('pt-BR')+'</b> pedidos de melhoria nos bairros.</p>'+
+    '<div class="resumos">'+
+      caixa('Quem mais propôs', topo(aCont,5), function(a){return '<button class="link" data-v="'+esc(a)+'" style="text-align:left">'+esc(nomeDe(a))+'</button>';}, function(a){return aCont[a];})+
+      caixa('O que mais pedem', topo(tCont,5), esc, function(t){return tCont[t];})+
+      caixa('Bairros mais citados', bTop.slice(0,5), function(k){return esc(bNome[k]);}, function(k){return bCont[k];})+
+    '</div><p class="nota" style="margin-top:-6px">Tema e bairro são reconhecidos pelas palavras do texto oficial de cada pedido. Um pedido pode ter mais de um tema. Os outros vereadores estão nos crachás, mais abaixo.</p>'+
+    '<h4>As propostas mais recentes da cidade</h4><div id="recLista"></div>';
+}
 function buscar(){
   var q = norm($('q').value.trim()), el=$('buscaRes');
-  if(q.length<3){ el.innerHTML='<div class="vazio">'+pedidos.length.toLocaleString('pt-BR')+' pedidos de melhoria desde janeiro de 2025. Digite pelo menos 3 letras.</div>'; return; }
+  marcarBairro();
+  if(q.length<3){ el.innerHTML=cidadeInteira(); paginar($('recLista'), D.docs, function(d){return itemDoc(d,true);}, 4); return; }
   var termos=q.split(/\s+/);
   var r = pedidos.filter(function(d){ return termos.every(function(t){return d._n.indexOf(t)>=0;}); });
   var por={}; r.forEach(function(d){ d.a.forEach(function(a){ por[a]=(por[a]||0)+1; }); });
@@ -390,15 +464,25 @@ buscar();
 (function(){
   var el=$('repLista');
   if(!D.repetidos.length){ el.innerHTML='<div class="vazio">Nenhum caso encontrado com a regra atual.</div>'; return; }
-  function bloco(r){
+  var MESES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  function mes(s){ return MESES[+s.slice(5,7)-1]+' '+s.slice(0,4); }
+  function bloco(r, k){
     var ds=r.i.map(function(i){return D.docs[i];});
     var dts=ds.map(function(d){return d.d;}).sort();
-    return '<details><summary><span>'+esc(r.tema)+' · '+esc(r.local)+'</span><span class="cnt">'+ds.length+' pedidos</span></summary>'+
-      '<div class="dentro"><div class="meta" style="color:var(--mut);font-size:13px">De '+dt(dts[0])+' a '+dt(dts[dts.length-1])+'</div><ul class="lista">'+ds.map(function(d){return itemDoc(d);}).join('')+'</ul></div></details>';
+    var vs={}; ds.forEach(function(d){ d.a.forEach(function(a){ vs[a]=1; }); }); var nv=Object.keys(vs).length;
+    var per=mes(dts[0])===mes(dts[dts.length-1])?'em '+mes(dts[0]):'de '+mes(dts[0])+' a '+mes(dts[dts.length-1]);
+    var txt='A '+r.local+', em Sinop, já recebeu '+ds.length+' pedidos de "'+r.tema.toLowerCase()+'" na Câmara, feitos por '+nv+' vereador'+(nv===1?'':'es')+' '+per+'. O problema foi resolvido? Veja os pedidos: '+location.origin+location.pathname+'#repetidos';
+    return '<details data-k="'+k+'"><summary><span class="rep-sum"><span>'+esc(r.local)+' · '+esc(r.tema)+'</span><small>'+nv+' vereador'+(nv===1?'':'es')+' pediram · '+per+'</small></span><span class="cnt"><b style="color:var(--ink);font-size:17px">'+ds.length+'</b> vezes</span></summary>'+
+      '<div class="dentro"><div class="cobrar"><a href="https://wa.me/?text='+encodeURIComponent(txt)+'" target="_blank" rel="noopener">Cobrar no WhatsApp</a><button type="button" data-copiar="'+esc(txt)+'">Copiar texto</button></div>'+
+      '<p class="nota">Mande para o vereador do seu bairro, para a Prefeitura (Ouvidoria) ou para os vizinhos. Os e-mails dos vereadores estão nos crachás.</p>'+
+      '<ul class="lista">'+ds.map(function(d){return itemDoc(d);}).join('')+'</ul></div></details>';
   }
+  el.addEventListener('click',function(e){ var b=e.target.closest('[data-copiar]'); if(!b) return;
+    var t=b.dataset.copiar, ok=function(){ b.textContent='Copiado ✓'; setTimeout(function(){b.textContent='Copiar texto';},2000); };
+    if(navigator.clipboard) navigator.clipboard.writeText(t).then(ok,function(){ prompt('Copie o texto:',t); }); else prompt('Copie o texto:',t); });
   var n=12; el.innerHTML=D.repetidos.slice(0,n).map(bloco).join('');
-  if(D.repetidos.length>n){ var b=document.createElement('button'); b.className='mais'; b.textContent='Mostrar todos ('+D.repetidos.length+')';
-    b.onclick=function(){ el.innerHTML=D.repetidos.map(bloco).join(''); }; el.appendChild(b); }
+  if(D.repetidos.length>n){ var b=document.createElement('button'); b.className='mais'; b.textContent='Mostrar mais ruas ('+(D.repetidos.length-n)+' na fila)';
+    b.onclick=function(){ b.remove(); el.insertAdjacentHTML('beforeend', D.repetidos.slice(n).map(function(r,i){return bloco(r,n+i);}).join('')); }; el.appendChild(b); }
 })();
 
 // ---------- homenagem ou trabalho
@@ -492,6 +576,17 @@ function itemDiaria(i){ return '<li><div class="meta">'+esc(i.d)+' a '+esc(i.r)+
 var partidos={}; D.vereadores.forEach(function(v){ if(v.partido) partidos[v.partido]=1; });
 $('fPartido').innerHTML='<option value="">Todos os partidos</option>'+Object.keys(partidos).sort().map(function(p){return '<option>'+esc(p)+'</option>';}).join('');
 function faltas(v){ return v.pres? v.pres.sessoes-v.pres.presente : 0; }
+function presBloco(pr){
+  if(!pr||!pr.sessoes) return '<div class="pres"><span>Presença: o sistema da Câmara não tem chamada com o nome dele.</span></div>';
+  var p=Math.round(100*pr.presente/pr.sessoes), just=pr.faltas.filter(function(x){return norm(x.m).indexOf('justific')>=0;}).length, aus=pr.faltas.length-just;
+  return '<div class="pres'+(p<85?' baixa':'')+'"><b>'+p+'%</b><span>de presença · '+pr.presente+' de '+pr.sessoes+' sessões<br>'+aus+' falta'+(aus===1?'':'s')+' sem justificativa · '+just+' justificada'+(just===1?'':'s')+'</span></div>';
+}
+function urna(v){
+  var t=v.tse; if(!t) return '';
+  var st=/eleito/i.test(t.situacao)&&!/n[aã]o/i.test(t.situacao)?'eleito':(/suplente/i.test(t.situacao)?'suplente que assumiu':esc(t.situacao.toLowerCase()));
+  if(v.status==='outros'&&st==='suplente que assumiu') st='suplente';
+  return '<div class="urna"><b>'+t.votos.toLocaleString('pt-BR')+'</b> votos em 2024 · '+st+(t.partido&&t.partido!==v.partido?' (pelo '+esc(t.partido)+')':'')+'</div>';
+}
 function cards(){
   var q=norm($('fNome').value), p=$('fPartido').value, o=$('fOrdem').value;
   var l=D.vereadores.filter(function(v){ return (!q||norm(v.nome).indexOf(q)>=0)&&(!p||v.partido===p); });
@@ -506,8 +601,8 @@ function cards(){
     var st = v.status==='licenciado'?' · licenciado':(v.status==='outros'?' · atuou na legislatura':'');
     return '<div class="card"><div class="cab"><div class="av">'+esc(ini(v.nome))+'</div><div><h3>'+esc(v.nome)+'</h3><div class="pt">'+esc(v.partido||'')+(v.cargo?' · '+esc(v.cargo):'')+st+'</div></div></div>'+
       (v.obs?'<div class="pt">'+esc(v.obs)+'</div>':'')+
-      '<div class="kv"><span>Presença nas sessões</span><span>'+(pr?pr.presente+' de '+pr.sessoes:'sem registro')+'</span>'+
-      '<span>Pedidos para os bairros</span><span>'+(c.pedido||0)+'</span>'+
+      presBloco(pr)+urna(v)+
+      '<div class="kv"><span>Pedidos para os bairros</span><span>'+(c.pedido||0)+'</span>'+
       '<span>Propostas de lei</span><span>'+(c.lei||0)+'</span>'+
       '<span>Perguntas e cobranças</span><span>'+(c.cobranca||0)+'</span>'+
       '<span>Homenagens</span><span>'+(c.homenagem||0)+'</span></div>'+
@@ -526,9 +621,10 @@ function abrir(slug){
     '<h2 style="margin-top:0">'+esc(v.nome)+'</h2><p class="sub">'+esc(v.partido||'')+(v.cargo?' · '+esc(v.cargo):'')+(v.obs?' · '+esc(v.obs):'')+
     ' · <a href="'+esc(v.url)+'" target="_blank" rel="noopener">ficha oficial na Câmara</a>'+
     (v.email&&v.status==='exercicio'?' · e-mail (o publicado na ficha oficial): <a href="mailto:'+esc(v.email)+'">'+esc(v.email)+'</a>':'')+'</p>';
+  if(v.tse) h+=urna(v).replace('class="urna"','class="urna" style="margin:-6px 0 12px"').replace('votos em 2024','votos na eleição de 2024 (resultado oficial do TSE)');
   h+='<h3>Presença</h3>';
   if(pr){
-    h+='<p>Presente em <b>'+pr.presente+'</b> de <b>'+pr.sessoes+'</b> sessões ordinárias e extraordinárias em que o nome dele aparece na chamada.</p>';
+    h+=presBloco(pr)+'<p>Presente em <b>'+pr.presente+'</b> de <b>'+pr.sessoes+'</b> sessões ordinárias e extraordinárias em que o nome dele aparece na chamada.</p>';
     if(pr.faltas.length){ h+='<details><summary><span>Registros diferentes de “Presente”</span><span class="cnt">'+pr.faltas.length+'</span></summary><div class="dentro"><ul class="lista">'+
       pr.faltas.map(function(f){return '<li><div class="meta">'+dt(f.d)+'</div><div class="em">'+esc(f.s)+' — <b>'+esc(f.m)+'</b></div><div class="meta"><a href="'+esc(f.u)+'" target="_blank" rel="noopener">ver a sessão na Câmara</a></div></li>';}).join('')+'</ul></div></details>'; }
   } else h+='<p class="vazio">O sistema da Câmara não tem chamada registrada com o nome dele.</p>';
@@ -700,6 +796,8 @@ function itemVot(x, tudo, meu){
   '<details><summary><span>Setor das propostas de lei</span></summary><div class="dentro"><p>Cada proposta de lei recebe um setor (saúde, educação, segurança e outros) conforme palavras do texto oficial, com a mesma lista de palavras para todos. É uma estimativa automática: uma proposta que fala de dois assuntos fica só no primeiro que a regra reconhece.</p></div></details>'+
   '<details><summary><span>Emendas ao orçamento</span></summary><div class="dentro"><p>O valor e a área de cada emenda são lidos do PDF assinado que a Câmara publica (campos “Categoria” e “Valor da emenda”). O total de cada vereador é a soma desses valores, uma conta nossa. O site mostra o que foi <b>indicado</b>, não o que foi pago: a execução é feita pela Prefeitura e não aparece no sistema da Câmara. Emendas de bancada ainda não entram.</p></div></details>'+
   '<details><summary><span>Votos</span></summary><div class="dentro"><p>Os votos vêm do botão “como votou cada vereador” de cada matéria, na página da sessão. Coletamos projetos, requerimentos, moções, vetos e pareceres. Indicações e atas ficaram de fora nesta versão.</p></div></details>'+
+  '<details><summary><span>Salário pago desde a posse (contador do topo)</span></summary><div class="dentro"><p>É uma estimativa: o salário bruto mensal de cada cargo, conforme o Quadro de Servidores do Portal da Transparência da Câmara, multiplicado pelo tempo desde 1º de janeiro de 2025, em tempo real. Usa o valor atual do quadro para todo o período e não inclui 13º, férias, encargos, verba indenizatória nem diárias (essas estão na seção “Quanto custa cada vereador”).</p></div></details>'+
+  '<details><summary><span>Votos na eleição de 2024</span></summary><div class="dentro"><p>Resultado oficial do TSE para vereador em Sinop (1º turno de 2024), ligado a cada vereador pelo nome de urna. “Suplente que assumiu” é quem não foi eleito direto e entrou no lugar de um titular. '+(D.tse?'<a href="'+esc(D.tse.fonte)+'" target="_blank" rel="noopener">Ver no site de resultados do TSE</a>.':'')+'</p></div></details>'+
   '<details><summary><span>Conferência: o site da Câmara × o que coletamos</span></summary><div class="dentro"><div class="tw"><table><tr><th>Tipo</th><th>Ano</th><th>Câmara informa</th><th>Coletado</th></tr>'+
     D.conferencia.map(function(c){return '<tr><td>'+esc(rot[c.sub]||c.sub)+'</td><td>'+c.ano+'</td><td>'+c.site+'</td><td'+(c.site!==c.coletado?' style="color:var(--bad);font-weight:700"':'')+'>'+c.coletado+'</td></tr>';}).join('')+'</table></div></div></details>'+
   '<details><summary><span>O que este site não mostra</span></summary><div class="dentro"><ul><li>Se a Prefeitura atendeu ou não cada pedido: o sistema da Câmara não informa.</li><li>Quais assessores trabalham para cada vereador: o portal da Câmara não informa.</li><li>Quanto das emendas a Prefeitura de fato pagou.</li><li>Trabalho em comissões, audiências públicas e atendimento no gabinete.</li><li>Qualidade das propostas. Número alto não quer dizer trabalho melhor.</li></ul></div></details>';
