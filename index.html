@@ -235,7 +235,7 @@ h4{margin:22px 0 4px;font-size:16px}
       <button data-aba="div">Quando não votaram junto</button>
     </div>
     <div id="aba-proj">
-      <input type="search" id="qv" placeholder="Ex.: LOA, Águas de Sinop, 119/2026, veto…" autocomplete="off">
+      <input type="search" id="qv" placeholder="Ex.: LOA, orçamento, 119/2026, veto…" autocomplete="off">
       <div id="projLista"></div>
     </div>
     <div id="aba-part" hidden>
@@ -399,6 +399,13 @@ $('nums').innerHTML = [
 ].map(function(x){return '<div class="num"><b>'+x[0].toLocaleString('pt-BR')+'</b><small>'+x[1]+'</small></div>';}).join('');
 $('tituloVer').textContent = 'Os '+emEx.length+' vereadores';
 
+// secoes sem dado nesta cidade saem da pagina e do menu
+function esconder(id){ $(id).hidden=true; var a=document.querySelector('nav a[href="#'+id+'"]'); if(a) a.remove(); }
+if(!D.gastos) esconder('gastos');
+if(!D.docs.some(function(d){return d.g==='emenda';})) esconder('emendas');
+if(!(D.executivo||[]).length) esconder('prefeitura');
+if(!(D.votacoes||[]).length) esconder('votos');
+
 // ---------- contador: salarios pagos desde a posse (estimativa a partir do quadro oficial)
 (function(){
   var G=D.gastos; if(!G||!G.quadro||!G.quadro.eletivos) return;
@@ -432,6 +439,7 @@ function topo(o,n){ return Object.keys(o).sort(function(a,b){return o[b]-o[a];})
 // recontagem igual a da busca (o nome aparece em qualquer parte do texto), para o numero bater com o resultado
 topo(bCont,30).forEach(function(k){ bCont[k]=pedidos.filter(function(d){return d._n.indexOf(k)>=0;}).length; });
 var bTop=topo(bCont,10);
+if(bTop.length>=3) $('q').placeholder='Ex.: '+bTop.slice(0,3).map(function(k){return bNome[k];}).join(', ')+'…';
 $('bairrosTop').innerHTML=bTop.map(function(k){return '<button data-b="'+esc(bNome[k])+'">'+esc(bNome[k])+'</button>';}).join('');
 $('bairrosTop').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return; var q=$('q');
   q.value = q.value===b.dataset.b ? '' : b.dataset.b; buscar(); });
@@ -471,7 +479,7 @@ buscar();
     var dts=ds.map(function(d){return d.d;}).sort();
     var vs={}; ds.forEach(function(d){ d.a.forEach(function(a){ vs[a]=1; }); }); var nv=Object.keys(vs).length;
     var per=mes(dts[0])===mes(dts[dts.length-1])?'em '+mes(dts[0]):'de '+mes(dts[0])+' a '+mes(dts[dts.length-1]);
-    var txt='A '+r.local+', em Sinop, já recebeu '+ds.length+' pedidos de "'+r.tema.toLowerCase()+'" na Câmara, feitos por '+nv+' vereador'+(nv===1?'':'es')+' '+per+'. O problema foi resolvido? Veja os pedidos: '+location.origin+location.pathname+'#repetidos';
+    var txt='A '+r.local+', em '+(D.cidade_nome||'Sinop')+', já recebeu '+ds.length+' pedidos de "'+r.tema.toLowerCase()+'" na Câmara, feitos por '+nv+' vereador'+(nv===1?'':'es')+' '+per+'. O problema foi resolvido? Veja os pedidos: '+location.origin+location.pathname+'#repetidos';
     return '<details data-k="'+k+'"><summary><span class="rep-sum"><span>'+esc(r.local)+' · '+esc(r.tema)+'</span><small>'+nv+' vereador'+(nv===1?'':'es')+' pediram · '+per+'</small></span><span class="cnt"><b style="color:var(--ink);font-size:17px">'+ds.length+'</b> vezes</span></summary>'+
       '<div class="dentro"><div class="cobrar"><a href="https://wa.me/?text='+encodeURIComponent(txt)+'" target="_blank" rel="noopener">Cobrar no WhatsApp</a><button type="button" data-copiar="'+esc(txt)+'">Copiar texto</button></div>'+
       '<p class="nota">Mande para o vereador do seu bairro, para a Prefeitura (Ouvidoria) ou para os vizinhos. Os e-mails dos vereadores estão nos crachás.</p>'+
@@ -747,7 +755,7 @@ function itemVot(x, tudo, meu){
       h+='<details><summary><span>Vereador por vereador</span></summary><div class="dentro"><div class="tw"><table><tr><th>Vereador</th>'+cab+Object.keys(porV).sort(function(a,b){return nomeDe(a).localeCompare(nomeDe(b),'pt');}).map(function(s){return linhaV(nomeDe(s),porV[s]);}).join('')+'</table></div></div></details>';
       h+='<details id="detDele"><summary><span>Ver essas votações</span><span class="cnt">'+dele.length+'</span></summary><div class="dentro"></div></details>';
     }
-    h+='<div class="aviso">Leia com cuidado: na Câmara de Sinop a grande maioria das votações termina com todos a favor, então é normal que os percentuais fiquem perto de 100%. A diferença aparece em poucas votações, que estão na aba “Quando não votaram junto”.</div>';
+    h+='<div class="aviso">Leia com cuidado: na Câmara de '+esc(D.cidade_nome||'Sinop')+' a grande maioria das votações termina com todos a favor, então é normal que os percentuais fiquem perto de 100%. A diferença aparece em poucas votações, que estão na aba “Quando não votaram junto”.</div>';
     $('partBox').innerHTML=h;
     var dd=$('detDele'); if(dd) dd.addEventListener('toggle',function(){ var box=dd.querySelector('.dentro'); if(dd.open&&!box.firstChild) paginar(box, dele, function(x){return itemVot(x,false);}, 12); });
   }
@@ -777,11 +785,17 @@ function itemVot(x, tudo, meu){
   var rot={'indicacao-12':'Indicações','requerimento-22':'Requerimentos','mocao-3000017':'Moções','projeto-de-decreto-legislativo-17':'Projetos de Decreto Legislativo',
     'projeto-de-lei-ordinaria-do-poder-legislativo-20':'Projetos de Lei Ordinária (vereadores)','projeto-de-lei-complementar-do-poder-legislativo-19':'Projetos de Lei Complementar (vereadores)',
     'projeto-de-resolucao-21':'Projetos de Resolução','proposta-de-emenda-a-lei-organica-municipal-107017':'Propostas de Emenda à Lei Orgânica','emenda-parlamentar-individual-107040':'Emendas Parlamentares Individuais',
-    'projeto-de-lei-ordinaria-107009':'Projetos de Lei Ordinária (Executivo)','projeto-de-lei-complementar-107010':'Projetos de Lei Complementar (Executivo)','veto-total-24':'Vetos Totais','veto-parcial-3000016':'Vetos Parciais'};
+    'projeto-de-lei-ordinaria-107009':'Projetos de Lei Ordinária (Executivo)','projeto-de-lei-complementar-107010':'Projetos de Lei Complementar (Executivo)','veto-total-24':'Vetos Totais','veto-parcial-3000016':'Vetos Parciais',
+    'indicacao':'Indicações','requerimento':'Requerimentos','mocao':'Moções','projeto-de-lei':'Projetos de Lei, Resolução e Emendas à Lei Orgânica',
+    'projeto-de-decreto-legislativo':'Projetos de Decreto Legislativo','emenda-parlamentar':'Emendas Parlamentares','veto':'Vetos'};
+  var SAPL=D.sistema==='SAPL';
   var sit=D.situacoes_presenca||{};
   var h='<p>Tudo neste site foi coletado automaticamente do site oficial da <a href="'+esc(D.fonte)+'" target="_blank" rel="noopener">Câmara Municipal de Sinop</a>. Nada é digitado à mão. Cada proposta, sessão e vereador tem um link para a página oficial, para você conferir.</p>'+
   '<details><summary><span>Presença</span></summary><div class="dentro"><p>Contamos só as sessões ordinárias e extraordinárias já realizadas, de janeiro de 2025 em diante, em que a Câmara publicou a chamada. Sessões solenes não entram.</p>'+
-    '<p>Se o nome do vereador não aparece na chamada de uma sessão, essa sessão não conta para ele: <b>dado ausente não é falta</b>. '+(D.sessoes_sem_chamada?D.sessoes_sem_chamada+' sessão(ões) não tinham chamada publicada e ficaram de fora.':'')+'</p>'+
+    (SAPL?'<p>O sistema da Câmara (SAPL) registra a lista de quem estava <b>presente</b> em cada sessão. Quem tinha mandato na data da sessão e não está na lista conta como falta. Se a Câmara registrou justificativa de ausência para aquela sessão, conta como falta justificada. '+(D.sessoes_sem_chamada?D.sessoes_sem_chamada+' sessão(ões) sem nenhuma presença registrada ficaram de fora.':'')+'</p>'+
+      '<p>O sistema não registra licenças. Para não contar licença como falta, o site usa duas regras iguais para todos: (1) só conta o período entre a primeira e a última presença registrada de cada vereador, o que cobre o suplente que atuou só por um tempo; (2) <b>5 ou mais faltas seguidas sem justificativa</b> são tratadas como licença ou afastamento e não entram na conta.'+
+      ((D.afastamentos||[]).length?' Casos tratados assim: '+D.afastamentos.map(function(a){return esc(nomeDe(a.slug)===a.slug?a.nome:nomeDe(a.slug))+' ('+a.sessoes+' sessões, de '+dt(a.de)+' a '+dt(a.ate)+')';}).join('; ')+'.':'')+'</p>'
+      :'<p>Se o nome do vereador não aparece na chamada de uma sessão, essa sessão não conta para ele: <b>dado ausente não é falta</b>. '+(D.sessoes_sem_chamada?D.sessoes_sem_chamada+' sessão(ões) não tinham chamada publicada e ficaram de fora.':'')+'</p>')+
     '<p>Situações que o sistema registrou: '+Object.keys(sit).map(function(k){return esc(k)+' ('+sit[k]+')';}).join(', ')+'.</p></div></details>'+
   '<details><summary><span>Como separamos homenagem de trabalho</span></summary><div class="dentro"><p>A regra olha o tipo do documento e palavras do texto oficial, igual para todos os vereadores:</p><ul>'+
     '<li><b>Pedidos de melhoria:</b> todas as Indicações (pedidos à Prefeitura).</li>'+
@@ -795,8 +809,8 @@ function itemVot(x, tudo, meu){
   '<details><summary><span>Pedidos por bairro e pedidos que voltam</span></summary><div class="dentro"><p>A busca procura o que você digitou no texto oficial de cada Indicação. Em “Pedidos que voltam”, o site junta Indicações do mesmo assunto que citam a mesma rua, avenida, travessa ou estrada. O assunto e o nome da via são reconhecidos por palavras do texto, então é uma estimativa. Um pedido não é prova de obra feita ou não feita.</p></div></details>'+
   '<details><summary><span>Setor das propostas de lei</span></summary><div class="dentro"><p>Cada proposta de lei recebe um setor (saúde, educação, segurança e outros) conforme palavras do texto oficial, com a mesma lista de palavras para todos. É uma estimativa automática: uma proposta que fala de dois assuntos fica só no primeiro que a regra reconhece.</p></div></details>'+
   '<details><summary><span>Emendas ao orçamento</span></summary><div class="dentro"><p>O valor e a área de cada emenda são lidos do PDF assinado que a Câmara publica (campos “Categoria” e “Valor da emenda”). O total de cada vereador é a soma desses valores, uma conta nossa. O site mostra o que foi <b>indicado</b>, não o que foi pago: a execução é feita pela Prefeitura e não aparece no sistema da Câmara. Emendas de bancada ainda não entram.</p></div></details>'+
-  '<details><summary><span>Votos</span></summary><div class="dentro"><p>Os votos vêm do botão “como votou cada vereador” de cada matéria, na página da sessão. Coletamos projetos, requerimentos, moções, vetos e pareceres. Indicações e atas ficaram de fora nesta versão.</p></div></details>'+
-  '<details><summary><span>Salário pago desde a posse (contador do topo)</span></summary><div class="dentro"><p>É uma estimativa: o salário bruto mensal de cada cargo, conforme o Quadro de Servidores do Portal da Transparência da Câmara, multiplicado pelo tempo desde 1º de janeiro de 2025, em tempo real. Usa o valor atual do quadro para todo o período e não inclui 13º, férias, encargos, verba indenizatória nem diárias (essas estão na seção “Quanto custa cada vereador”).</p></div></details>'+
+  '<details><summary><span>Votos</span></summary><div class="dentro"><p>'+(SAPL?'Os votos vêm do registro de votação nominal de cada matéria no sistema da Câmara (SAPL): Sim, Não, Abstenção ou Não votou. Só entram as votações em que a Câmara registrou o voto de cada vereador; votações simbólicas não têm esse registro. Indicações e atas ficaram de fora.':'Os votos vêm do botão “como votou cada vereador” de cada matéria, na página da sessão. Coletamos projetos, requerimentos, moções, vetos e pareceres. Indicações e atas ficaram de fora nesta versão.')+'</p></div></details>'+
+  (!D.gastos?'':'<details><summary><span>Salário pago desde a posse (contador do topo)</span></summary><div class="dentro"><p>É uma estimativa: o salário bruto mensal de cada cargo, conforme o Quadro de Servidores do Portal da Transparência da Câmara, multiplicado pelo tempo desde 1º de janeiro de 2025, em tempo real. Usa o valor atual do quadro para todo o período e não inclui 13º, férias, encargos, verba indenizatória nem diárias (essas estão na seção “Quanto custa cada vereador”).</p></div></details>')+
   '<details><summary><span>Votos na eleição de 2024</span></summary><div class="dentro"><p>Resultado oficial do TSE para vereador em Sinop (1º turno de 2024), ligado a cada vereador pelo nome de urna. “Suplente que assumiu” é quem não foi eleito direto e entrou no lugar de um titular. '+(D.tse?'<a href="'+esc(D.tse.fonte)+'" target="_blank" rel="noopener">Ver no site de resultados do TSE</a>.':'')+'</p></div></details>'+
   '<details><summary><span>Conferência: o site da Câmara × o que coletamos</span></summary><div class="dentro"><div class="tw"><table><tr><th>Tipo</th><th>Ano</th><th>Câmara informa</th><th>Coletado</th></tr>'+
     D.conferencia.map(function(c){return '<tr><td>'+esc(rot[c.sub]||c.sub)+'</td><td>'+c.ano+'</td><td>'+c.site+'</td><td'+(c.site!==c.coletado?' style="color:var(--bad);font-weight:700"':'')+'>'+c.coletado+'</td></tr>';}).join('')+'</table></div></div></details>'+
@@ -810,7 +824,7 @@ function itemVot(x, tudo, meu){
 // ---------- licitacoes (PNCP)
 (function(){
 var L = window.RADAR_LIC, box = document.getElementById('licitacoes');
-if(!L){ box.querySelector('.sub').insertAdjacentHTML('afterend','<div class="vazio">Dados de licitações ainda não gerados.</div>'); return; }
+if(!L){ box.hidden=true; var ln=document.querySelector('nav a[href="#licitacoes"]'); if(ln) ln.remove(); return; }
 var $ = function(id){ return document.getElementById(id); };
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 function norm(s){ return (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase(); }
